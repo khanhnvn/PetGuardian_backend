@@ -31,12 +31,6 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-# Lấy thông tin kết nối từ biến môi trường DATABASE_URL
-DATABASE_URL = os.environ.get('DATABASE_URL')
-
-# Kết nối đến Heroku Postgres
-conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-
 mysql = MySQL(app)
 
 # frontend_folder = os.path.join(os.getcwd(),"..","frontend")
@@ -110,10 +104,28 @@ def format_currency(amount):
   amount = math.floor(amount / 1000) * 1000
   return locale.currency(amount, grouping=True, symbol=True)
 
+def with_connection(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # Lấy thông tin kết nối từ biến môi trường DATABASE_URL
+        DATABASE_URL = os.environ.get('DATABASE_URL')
+
+        # Kết nối đến Heroku Postgres
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+
+        try:
+            result = func(conn, *args, **kwargs)  # Truyền conn vào hàm func
+        finally:
+            conn.close()  # Đóng kết nối trong finally block
+
+        return result
+    return wrapper
+
 
 # === API endpoints cho login/register ===
 
 @app.route('/api/register', methods=['POST'])
+@with_connection
 def register():
     try:
         data = request.get_json()
@@ -146,6 +158,7 @@ def register():
         return jsonify({'message': f'Đã có lỗi xảy ra: {str(e)}'}), 500
 
 @app.route('/api/login', methods=['POST'])
+@with_connection
 def login():
     try:
         data = request.get_json()
@@ -184,6 +197,7 @@ def uploaded_file(filename):
 # === API endpoints cho forgot_password ===
 
 @app.route('/api/forgot_password', methods=['POST'])
+@with_connection
 def forgot_password():
     try:
         data = request.get_json()
@@ -212,6 +226,7 @@ def forgot_password():
         return jsonify({'message': 'Đã có lỗi xảy ra'}), 500
 
 @app.route('/api/change_password', methods=['POST'])
+@with_connection
 def change_password():
     try:
         data = request.get_json()
@@ -242,6 +257,7 @@ def change_password():
 
 @app.route('/api/pets', methods=['POST'])
 @login_required
+@with_connection
 def add_pet():
     # Lấy dữ liệu từ form
     pet_name = request.form.get('pet_name')
@@ -277,6 +293,7 @@ def add_pet():
     
 @app.route('/api/pets', methods=['GET'])
 @login_required
+@with_connection
 def get_pets():
     user_id = session['id']
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -286,6 +303,7 @@ def get_pets():
 
 @app.route('/api/pets/<int:pet_id>', methods=['DELETE'])
 @login_required
+@with_connection
 def delete_pet(pet_id):
     try:
         with mysql.connection.cursor() as cursor:
@@ -299,6 +317,7 @@ def delete_pet(pet_id):
 
 @app.route('/api/pets/<int:pet_id>', methods=['PATCH'])
 @login_required
+@with_connection
 def update_pet(pet_id):
     try:
         data = request.get_json()
@@ -322,6 +341,7 @@ def update_pet(pet_id):
 
 @app.route('/api/pets/<int:pet_id>', methods=['GET'])
 @login_required
+@with_connection
 def get_pet_details(pet_id):
     try:
         with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
@@ -355,6 +375,7 @@ def get_pet_details(pet_id):
 
 @app.route('/api/pets/<int:pet_id>/weight', methods=['POST'])
 @login_required
+@with_connection
 def add_pet_weight(pet_id):
     try:
         weight = request.form.get('weight')
@@ -383,6 +404,7 @@ def add_pet_weight(pet_id):
 
 @app.route('/api/pets/<int:pet_id>/weight/<int:weight_id>', methods=['DELETE'])
 @login_required
+@with_connection
 def delete_pet_weight(pet_id, weight_id):
     try:
         with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
@@ -405,6 +427,7 @@ def delete_pet_weight(pet_id, weight_id):
     
 @app.route('/api/pets/<int:pet_id>/vaccines', methods=['POST'])
 @login_required
+@with_connection
 def add_pet_vaccine(pet_id):
     try:
         vaccine_name = request.form.get('vaccine_name')
@@ -434,6 +457,7 @@ def add_pet_vaccine(pet_id):
 
 @app.route('/api/pets/<int:pet_id>/vaccines/<int:vaccine_id>', methods=['DELETE'])
 @login_required
+@with_connection
 def delete_pet_vaccine(pet_id, vaccine_id):
     try:
         with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
@@ -455,6 +479,7 @@ def delete_pet_vaccine(pet_id, vaccine_id):
     
 @app.route('/api/pets/<int:pet_id>/medications', methods=['POST'])
 @login_required
+@with_connection
 def add_pet_medication(pet_id):
     try:
         medication_name = request.form.get('medication_name')
@@ -484,6 +509,7 @@ def add_pet_medication(pet_id):
 
 @app.route('/api/pets/<int:pet_id>/medications/<int:medication_id>', methods=['DELETE'])
 @login_required
+@with_connection
 def delete_pet_medication(pet_id, medication_id):
     try:
         with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
@@ -505,6 +531,7 @@ def delete_pet_medication(pet_id, medication_id):
     
 @app.route('/api/pets/<int:pet_id>/allergies', methods=['POST'])
 @login_required
+@with_connection
 def add_pet_allergy(pet_id):
     try:
         allergy = request.form.get('allergy')
@@ -534,6 +561,7 @@ def add_pet_allergy(pet_id):
 
 @app.route('/api/pets/<int:pet_id>/allergies/<int:allergy_id>', methods=['DELETE'])
 @login_required
+@with_connection
 def delete_pet_allergy(pet_id, allergy_id):
     try:
         with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
@@ -558,6 +586,7 @@ def delete_pet_allergy(pet_id, allergy_id):
 
 @app.route('/api/veterinarian_contacts', methods=['POST'])
 @login_required
+@with_connection
 def add_veterinarian_contact():
     try:
         data = request.get_json()
@@ -586,6 +615,7 @@ def add_veterinarian_contact():
     
 @app.route('/api/veterinarian_contacts', methods=['GET'])
 @login_required
+@with_connection
 def get_veterinarian_contacts():
     try:
         with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
@@ -598,6 +628,7 @@ def get_veterinarian_contacts():
     
 @app.route('/api/veterinarian_contacts/<int:contact_id>', methods=['PUT'])
 @login_required
+@with_connection
 def update_veterinarian_contact(contact_id):
     try:
         data = request.get_json()
@@ -640,6 +671,7 @@ def update_veterinarian_contact(contact_id):
     
 @app.route('/api/veterinarian_contacts/<int:contact_id>', methods=['DELETE'])
 @login_required
+@with_connection
 def delete_veterinarian_contact(contact_id):
     try:
         with mysql.connection.cursor() as cursor:
@@ -656,6 +688,7 @@ def delete_veterinarian_contact(contact_id):
 
 @app.route('/api/products', methods=['GET'])
 @login_required
+@with_connection
 def get_products():
     # Lấy danh sách tất cả sản phẩm (cho user)
     try:
@@ -676,6 +709,7 @@ def get_products():
     
 @app.route('/api/admin/products', methods=['GET'])  # Đổi tên endpoint để phân biệt
 @login_required
+@with_connection
 def get_all_products():
     try:
         # Kiểm tra role (chỉ admin mới được phép truy cập)
@@ -704,6 +738,7 @@ def get_all_products():
     
 @app.route('/api/admin/products/<int:product_id>', methods=['PUT'])
 @login_required
+@with_connection
 def update_product_admin(product_id):
     try:
         # Kiểm tra role (chỉ admin mới được phép truy cập)
@@ -770,6 +805,7 @@ def update_product_admin(product_id):
     
 @app.route('/api/admin/products/<int:product_id>', methods=['DELETE'])
 @login_required
+@with_connection
 def delete_product_admin(product_id):
     try:
         # Kiểm tra role (chỉ admin mới được phép truy cập)
@@ -788,6 +824,7 @@ def delete_product_admin(product_id):
 
 @app.route('/api/products/<int:product_id>', methods=['GET'])
 @login_required
+@with_connection
 def get_product(product_id):
     try:
         with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
@@ -813,6 +850,7 @@ def get_product(product_id):
 
 @app.route('/api/products/my', methods=['GET'])
 @login_required
+@with_connection
 def get_my_products():
     # Lấy danh sách sản phẩm của customer hiện tại
     try:
@@ -837,6 +875,7 @@ def get_my_products():
 
 @app.route('/api/products', methods=['POST'])
 @login_required
+@with_connection
 def add_product():
     try:
         if session['role_id'] not in (2, 3):  # Chỉ customer và admin mới được phép thêm sản phẩm
@@ -880,6 +919,7 @@ def add_product():
 
 @app.route('/api/products/<int:product_id>', methods=['PUT'])
 @login_required
+@with_connection
 def update_product(product_id):
     # Cập nhật thông tin sản phẩm (cho customer và admin)
     try:
@@ -952,6 +992,7 @@ def update_product(product_id):
 
 @app.route('/api/products/<int:product_id>', methods=['DELETE'])
 @login_required
+@with_connection
 def delete_product(product_id):
     # Xóa sản phẩm (cho customer và admin)
     try:
@@ -983,6 +1024,7 @@ def delete_product(product_id):
 
 @app.route('/api/services/my', methods=['GET'])
 @login_required
+@with_connection
 def get_my_services():
     """Lấy danh sách dịch vụ của customer hiện tại."""
     try:
@@ -1003,6 +1045,7 @@ def get_my_services():
 
 @app.route('/api/services', methods=['POST'])
 @login_required
+@with_connection
 def add_service():
     """Thêm dịch vụ mới."""
     try:
@@ -1031,6 +1074,7 @@ def add_service():
 
 @app.route('/api/services/<int:service_id>', methods=['PUT'])
 @login_required
+@with_connection
 def update_service(service_id):
     """Cập nhật thông tin dịch vụ."""
     try:
@@ -1073,6 +1117,7 @@ def update_service(service_id):
 
 @app.route('/api/services/<int:service_id>', methods=['DELETE'])
 @login_required
+@with_connection
 def delete_service(service_id):
     """Xóa dịch vụ."""
     try:
@@ -1090,6 +1135,7 @@ def delete_service(service_id):
         return jsonify({'message': 'Đã có lỗi xảy ra'}), 500
 
 @app.route('/api/services', methods=['GET'])
+@with_connection
 def get_services():
     """Lấy danh sách tất cả dịch vụ."""
     try:
@@ -1110,6 +1156,7 @@ def get_services():
 
 @app.route('/api/cart', methods=['GET'])
 @login_required
+@with_connection
 def get_cart():
     try:
         with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
@@ -1125,6 +1172,7 @@ def get_cart():
 
 @app.route('/api/cart/add', methods=['POST'])
 @login_required
+@with_connection
 def add_to_cart():
     try:
         data = request.get_json()
@@ -1173,6 +1221,7 @@ def add_to_cart():
 
 @app.route('/api/cart/remove/<int:cart_item_id>', methods=['DELETE']) 
 @login_required
+@with_connection
 def remove_from_cart(cart_item_id):
     try:
         # Xóa sản phẩm khỏi bảng cart
@@ -1187,6 +1236,7 @@ def remove_from_cart(cart_item_id):
 
 @app.route('/api/cart/update', methods=['PUT'])
 @login_required
+@with_connection
 def update_cart():
     try:
         data = request.get_json()
@@ -1217,6 +1267,7 @@ def update_cart():
 
 @app.route('/api/cart/checkout', methods=['POST'])
 @login_required
+@with_connection
 def checkout():
     print("session:", session)
     try:
@@ -1372,6 +1423,7 @@ def checkout():
 
 @app.route('/api/customers/revenue', methods=['GET'])
 @login_required
+@with_connection
 def get_customer_revenue():
     try:
         with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
@@ -1396,6 +1448,7 @@ def get_customer_revenue():
 
 @app.route('/api/admin/transactions', methods=['GET'])
 @login_required
+@with_connection
 def get_transactions():
     try:
         filter = request.args.get('filter', 'today')
@@ -1461,6 +1514,7 @@ def get_transactions():
 
 @app.route('/api/transactions/<int:transaction_id>', methods=['GET'])
 @login_required
+@with_connection
 def get_transaction_details(transaction_id):
     try:
         with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
