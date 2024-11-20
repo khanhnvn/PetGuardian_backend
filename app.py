@@ -15,6 +15,7 @@ from payos import PaymentData, ItemData, PayOS
 from dotenv import load_dotenv
 import json
 from datetime import datetime
+import psycopg2
 
 app = Flask(__name__, static_folder='../frontend/public')
 app.secret_key = 'your secret key' 
@@ -28,7 +29,13 @@ UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+# Lấy thông tin kết nối từ biến môi trường DATABASE_URL
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+# Kết nối đến Heroku Postgres
+conn = psycopg2.connect(DATABASE_URL, sslmode='require')
 
 mysql = MySQL(app)
 
